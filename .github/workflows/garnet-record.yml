@@ -42,9 +42,9 @@ jobs:
           NX_DAEMON: "false"
           NX_NO_CLOUD: "true"
         run: |
-          node node_modules/nx/bin/nx.js build twenty-shared
-          node node_modules/nx/bin/nx.js reset:env twenty-server
-          node node_modules/nx/bin/nx.js build twenty-server
+          npx --no-install nx build twenty-shared
+          npx --no-install nx reset:env twenty-server
+          npx --no-install nx build twenty-server
       - name: Let sensor settle
         if: always()
         run: sleep 30
