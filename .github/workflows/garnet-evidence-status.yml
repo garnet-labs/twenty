@@ -1,0 +1,42 @@
+name: Garnet Evidence Status
+
+on:
+  issue_comment:
+    types: [created, edited]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Fork PR to sync
+        type: number
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: garnet-evidence-status-${{ github.event.issue.number || inputs.pr_number }}
+  cancel-in-progress: false
+
+jobs:
+  status:
+    if: >-
+      github.repository == 'garnet-labs/twenty' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.issue.pull_request != null &&
+        github.event.comment.user.login == 'garnet-runtime-review[bot]' &&
+        contains(github.event.comment.body, 'garnet:summary')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.issue.number || inputs.pr_number }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Report the scoped result (informational only)
+        run: python3 .github/merge-gate/gate.py --status "$GITHUB_REPOSITORY" "$PR_NUMBER" >> "$GITHUB_STEP_SUMMARY"
