@@ -1,0 +1,50 @@
+# garnet-runtime-review: installed by a coding agent (devin-plugin)
+name: Garnet Runtime Visibility
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: garnet-record-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  server-build:
+    if: >-
+      github.repository == 'garnet-labs/twenty' &&
+      (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: garnet-org/action@673a06d87748bec49e4d8df22d371b2a3420aba4 # v2.5.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - name: Install dependencies (hardened, no lifecycle scripts)
+        run: |
+          YARN_VERSION="$(node -p 'require("./package.json").packageManager.match(/^yarn@([0-9]+[.][0-9]+[.][0-9]+)$/)[1]')"
+          YARN_RELEASE=".yarn/releases/yarn-$YARN_VERSION.cjs"
+          test -f "$YARN_RELEASE"
+          YARN_ENABLE_HARDENED_MODE=true YARN_ENABLE_SCRIPTS=false node "$YARN_RELEASE" --immutable --check-cache
+      - name: Build twenty-server
+        env:
+          NX_DAEMON: "false"
+          NX_NO_CLOUD: "true"
+        run: |
+          node node_modules/nx/bin/nx.js build twenty-shared
+          node node_modules/nx/bin/nx.js reset:env twenty-server
+          node node_modules/nx/bin/nx.js build twenty-server
+      - name: Let sensor settle
+        if: always()
+        run: sleep 30
